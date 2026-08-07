@@ -74,7 +74,12 @@ build_script:
     # --no-angle: MSYS2's MinGW Qt5 is a desktop-OpenGL build and ships no
     # ANGLE, so windeployqt's attempt to bundle libGLESv2.dll/libEGL.dll fails
     # fatally with "libGLESv2.dll does not exist". Disable ANGLE deployment.
-    - set PATH=C:\msys64\mingw64\bin;%PATH% && c:\msys64\mingw64\bin\windeployqt-qt5.exe --dir c:\pixelpulse_64 --no-system-d3d-compiler --no-compiler-runtime --no-angle --opengl c:\projects\build_64\pixelpulse2.exe
+    #
+    # --no-translations: building the merged .qm files runs lconvert.exe,
+    # which (like qmlimportscanner) ships in the plain-build qt5-tools package
+    # and dies against the KDE-patched Qt5Core. We don't need translations --
+    # main.cpp pins the locale to English/UnitedStates -- so skip that step.
+    - set PATH=C:\msys64\mingw64\bin;%PATH% && c:\msys64\mingw64\bin\windeployqt-qt5.exe --dir c:\pixelpulse_64 --no-system-d3d-compiler --no-compiler-runtime --no-angle --no-translations --opengl c:\projects\build_64\pixelpulse2.exe
 
     # Copy the QML modules the app imports (see qml/*.qml import statements):
     # QtQuick + its submodules (Controls, Controls.Styles, Dialogs, Layouts,
