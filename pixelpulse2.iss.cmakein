@@ -62,15 +62,7 @@ Name: "{commondesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desk
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(AppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent unchecked
-Filename: {app}\pp2trayer\pp2trayer.exe; Description: "Launch Pixelpulse2 Trayer"; Flags: nowait postinstall skipifsilent
 Filename: "{app}\drivers\dpinst.exe"; Parameters: "/PATH ""{app}\drivers"" {param:dpinstflags|/F}"; Flags: waituntilterminated; Tasks: drivers
-
-[UninstallRun]
-Filename: "{cmd}"; Parameters: "/C""taskkill /im pp2trayer\pp2trayer.exe /f /t"; Flags: runhidden
-
-[Registry]
-; Make Pixelpulse2 Trayer run every time Windows boots
-Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Pixelpulse2Trayer"; ValueData: """{app}\pp2trayer\pp2trayer.exe"""; Flags: uninsdeletevalue
 
 ; Functions GetNumber(), CompareInner(), CompareVersion() and InitializeSetup() can be used to detect
 ; differences between the version being installed and the version that might be already installed.

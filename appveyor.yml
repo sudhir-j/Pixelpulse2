@@ -29,9 +29,6 @@ install:
     - copy C:\projects\libsmu\dist\amd64\* c:\projects\pixelpulse2\distrib\drivers\amd64
     - copy C:\dpinst\dpinst_amd64.exe c:\projects\pixelpulse2\distrib
 
-    - 'appveyor DownloadFile "https://ci.appveyor.com/api/projects/analogdevicesinc/pixelpulse2-trayer/artifacts/distrib.zip?branch=master" -FileName c:\distrib.zip'
-    - 7z x -y "c:\distrib.zip" -o"c:\" > nul
-
 build_script:
     # build 64-bit MinGW
     #clone and build libsmu with mingw
@@ -54,7 +51,6 @@ build_script:
 
    # Copy the dependencies
     - mkdir c:\pixelpulse_64
-    - mkdir c:\pixelpulse_64\pp2trayer
     - copy c:\projects\build_64\pixelpulse2.exe c:\pixelpulse_64\
     - if not exist "c:\pixelpulse_64\drivers" mkdir c:\pixelpulse_64\drivers
     - copy C:\projects\libsmu\dist\m1k-winusb.inf c:\pixelpulse_64\drivers
@@ -63,8 +59,6 @@ build_script:
     - copy C:\projects\libsmu\dist\amd64\* c:\pixelpulse_64\drivers\amd64
     - copy C:\dpinst\dpinst_amd64.exe C:\pixelpulse_64\drivers
 
-    - C:\msys64\usr\bin\bash -lc "cp -r /c/distrib/* /c/pixelpulse_64/pp2trayer"
-    - 'appveyor DownloadFile "https://ci.appveyor.com/api/projects/analogdevicesinc/pixelpulse2-trayer/artifacts/pp2trayer.exe?branch=master" -FileName c:\pixelpulse_64\pp2trayer\pp2trayer.exe'
     - c:\msys64\mingw64\bin\windeployqt.exe --dir c:\pixelpulse_64 --no-system-d3d-compiler --no-compiler-runtime --opengl --qmldir c:\projects\pixelpulse2\qml --qmlimport c:\projects\pixelpulse2\qml c:\projects\build_64\pixelpulse2.exe
 
     - C:\msys64\usr\bin\bash -lc "cd /mingw64/bin ; cp -r libffi*.dll libbrotli*.dll libbz2*.dll libgobject-2.*.dll libfreetype-*.dll libgraphite*.dll libpng16-*.dll libharfbuzz*.dll libicu*.dll libiconv*.dll zlib*.dll libsmu*.dll libwinpthread-*.dll libgcc_*.dll libstdc++-*.dll libboost_{system,filesystem,atomic,program_options,regex,thread}-*.dll libglib-*.dll libintl-*.dll libusb-*.dll libzstd*.dll libgomp*.dll libdouble-conversion*.dll libpcre*.dll /c/pixelpulse_64/"
@@ -79,7 +73,7 @@ build_script:
 
   # Build the installer
     - cd "c:\projects\build_64\"
-    - set PATH=%PATH%;"C:\Program Files (x86)\Inno Setup 5"
+    - set PATH=%PATH%;"C:\Program Files (x86)\Inno Setup 6"
     - ISCC /Q pixelpulse2.iss
 
     - ps: appveyor PushArtifact c:\Pixelpulse2_win_setup.exe
