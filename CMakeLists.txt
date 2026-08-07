@@ -224,3 +224,31 @@ if (NOT WIN32)
 		target_link_libraries(${PROJECT_NAME} LINK_PRIVATE ${PTHREAD_LIBRARIES})
 	endif()
 endif()
+
+# CPack: on Linux build a .deb and a .tar.gz from the install() rules above.
+# (Windows is packaged separately via Inno Setup / pixelpulse2.iss.)
+if (UNIX AND NOT APPLE)
+	set(CPACK_GENERATOR "DEB;TGZ")
+	set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
+	set(CPACK_PACKAGE_VENDOR "Analog Devices, Inc.")
+	set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Signal visualizer and controller for the ADALM1000")
+	set(CPACK_PACKAGE_VERSION ${PP_VERSION})
+	set(CPACK_PACKAGE_VERSION_MAJOR ${PP_VERSION_MAJOR})
+	set(CPACK_PACKAGE_VERSION_MINOR ${PP_VERSION_MINOR})
+	set(CPACK_PACKAGE_VERSION_PATCH ${PP_VERSION_PATCH})
+	set(CPACK_PACKAGING_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
+
+	# Debian package specifics
+	set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Analog Devices, Inc.")
+	set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/analogdevicesinc/Pixelpulse2")
+	set(CPACK_DEBIAN_PACKAGE_SECTION "electronics")
+	# Resolve shared-library run-time dependencies (Qt5, libusb, ...)
+	# automatically from what the binary links against.
+	set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+	# libsmu is not in the distro repos, so shlibdeps can't resolve it; declare
+	# it (and the Qt5 QML runtime, which is a data dependency the linker can't
+	# see) explicitly.
+	set(CPACK_DEBIAN_PACKAGE_DEPENDS "libsmu (>= 1.0), qml-module-qtquick2, qml-module-qtquick-controls, qml-module-qtquick-dialogs, qml-module-qtquick-layouts, qml-module-qtquick-window2, qml-module-qtgraphicaleffects")
+
+	include(CPack)
+endif()

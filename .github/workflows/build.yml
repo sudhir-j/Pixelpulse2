@@ -1,0 +1,210 @@
+name: build
+
+on:
+  push:
+    branches: [master, "**"]
+  pull_request:
+    branches: [master]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Linux: build pixelpulse2 and package it as a .deb and a .tar.gz via CPack.
+  # ---------------------------------------------------------------------------
+  linux:
+    name: Linux (Ubuntu, .deb + .tar.gz)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake git pkg-config \
+            libusb-1.0-0-dev libboost-all-dev \
+            qtbase5-dev qtdeclarative5-dev libqt5svg5-dev libqt5opengl5-dev \
+            qttools5-dev \
+            qml-module-qtquick2 qml-module-qtquick-controls \
+            qml-module-qtquick-dialogs qml-module-qtquick-layouts \
+            qml-module-qtquick-window2 qml-module-qtgraphicaleffects \
+            qml-module-qtqml-models2
+
+      - name: Build and install libsmu
+        run: |
+          git clone --depth=1 https://github.com/analogdevicesinc/libsmu.git
+          cmake -S libsmu -B libsmu/build \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_CXX_FLAGS=-std=c++14 \
+            -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PYTHON=OFF \
+            -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build libsmu/build -j"$(nproc)"
+          sudo cmake --install libsmu/build
+          sudo ldconfig
+
+      - name: Configure and build pixelpulse2
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build -j"$(nproc)"
+
+      - name: Package (.deb + .tar.gz)
+        working-directory: build
+        run: cpack -G "DEB;TGZ"
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixelpulse2-linux
+          path: |
+            build/*.deb
+            build/*.tar.gz
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Windows: MSYS2/MinGW-w64 build, ported faithfully from appveyor.yml.
+  # Uses the same hardcoded c:\projects\pixelpulse2 / c:\pixelpulse_64 layout
+  # so the generated pixelpulse2.iss and the deploy steps work unchanged.
+  # ---------------------------------------------------------------------------
+  windows:
+    name: Windows (MSYS2, zip + installer)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSYS2 (MINGW64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-boost
+            mingw-w64-x86_64-python3
+            mingw-w64-x86_64-libzip
+            mingw-w64-x86_64-icu
+            mingw-w64-x86_64-libusb
+            mingw-w64-x86_64-qt5
+
+      # Reproduce the AppVeyor directory layout so every hardcoded c:\ path
+      # (including the ones baked into pixelpulse2.iss) resolves.
+      - name: Stage source at c:/projects/pixelpulse2
+        run: |
+          mkdir -p /c/projects
+          cp -r "$GITHUB_WORKSPACE" /c/projects/pixelpulse2
+
+      # Hack: the Qt5Qml CMake script errors loading its plugins; drop them.
+      - name: Drop Qt5Qml plugin cmake files
+        run: rm -f /mingw64/lib/cmake/Qt5Qml/*Factory.cmake
+
+      - name: Fetch dpinst (driver installer)
+        run: |
+          curl -L -o /c/dpinst.zip http://swdownloads.analog.com/cse/m1k/drivers/dpinst.zip
+          7z x -y /c/dpinst.zip -o/c/dpinst
+
+      - name: Build and install libsmu
+        run: |
+          git clone --depth=1 https://github.com/analogdevicesinc/libsmu.git /c/projects/libsmu
+          # Stage the driver payload the installer expects.
+          mkdir -p /c/projects/pixelpulse2/distrib/drivers/amd64
+          cp /c/projects/libsmu/dist/m1k-winusb.inf /c/projects/pixelpulse2/distrib/drivers/
+          cp /c/projects/libsmu/dist/m1k-winusb.cat /c/projects/pixelpulse2/distrib/drivers/
+          cp /c/projects/libsmu/dist/amd64/* /c/projects/pixelpulse2/distrib/drivers/amd64/
+          cp /c/dpinst/dpinst_amd64.exe /c/projects/pixelpulse2/distrib/
+          # Build libsmu. CMAKE_POLICY_VERSION_MINIMUM=3.5 works around CMake 4
+          # dropping <3.5 policy support; -std=c++14 is required by Boost 1.91.
+          mkdir -p /c/projects/libsmu/mingw-64
+          cd /c/projects/libsmu/mingw-64
+          cmake -G 'Unix Makefiles' \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_CXX_FLAGS=-std=c++14 \
+            -DCMAKE_INSTALL_PREFIX=/mingw64 \
+            -DLIBUSB_LIBRARIES=/mingw64/lib/libusb-1.0.dll.a \
+            -DLIBUSB_INCLUDE_DIRS=/mingw64/include/libusb-1.0 \
+            -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PYTHON=OFF ..
+          cmake --build . -j"$(nproc)"
+          cmake --build . --target install
+
+      - name: Configure and build pixelpulse2
+        run: |
+          # windres is invoked under its target-prefixed name by the .rc rule.
+          cp /mingw64/bin/windres.exe /mingw64/bin/x86_64-w64-mingw32-windres.exe
+          mkdir -p /c/projects/build_64
+          cd /c/projects/build_64
+          cmake -G 'Unix Makefiles' \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DLIBUSB_LIBRARIES=/mingw64/lib/libusb-1.0.dll.a \
+            -DLIBUSB_INCLUDE_DIRS=/mingw64/include/libusb-1.0 \
+            -DLIBSMU_LIBRARIES=/mingw64/lib/libsmu.dll.a \
+            -DLIBSMU_INCLUDE_DIRS=/mingw64/include \
+            /c/projects/pixelpulse2
+          make -j"$(nproc)"
+
+      - name: Assemble app bundle (c:/pixelpulse_64)
+        run: |
+          mkdir -p /c/pixelpulse_64/drivers/amd64
+          cp /c/projects/build_64/pixelpulse2.exe /c/pixelpulse_64/
+          cp /c/projects/libsmu/dist/m1k-winusb.inf /c/pixelpulse_64/drivers/
+          cp /c/projects/libsmu/dist/m1k-winusb.cat /c/pixelpulse_64/drivers/
+          cp /c/projects/libsmu/dist/amd64/* /c/pixelpulse_64/drivers/amd64/
+          cp /c/dpinst/dpinst_amd64.exe /c/pixelpulse_64/drivers/
+
+      - name: Deploy Qt
+        # Drop --qmldir/--qmlimport: those make windeployqt spawn
+        # qmlimportscanner.exe, which is broken in the current MSYS2 packaging
+        # (plain-build qt5-tools vs KDE-patched qt5-base -> STATUS_ENTRYPOINT_
+        # NOT_FOUND). --no-angle: this is a desktop-OpenGL Qt with no ANGLE.
+        # --no-translations: skips lconvert.exe (same qt5-tools skew); the app
+        # pins its locale to English anyway.
+        run: |
+          windeployqt-qt5.exe --dir /c/pixelpulse_64 \
+            --no-system-d3d-compiler --no-compiler-runtime \
+            --no-angle --no-translations --opengl \
+            /c/projects/build_64/pixelpulse2.exe
+
+      - name: Copy QML modules
+        # Replaces the qmlimportscanner-driven deployment: copy the modules the
+        # app imports (see qml/*.qml). QtQuick.2 is the QtQuick core plugin dir.
+        run: |
+          mkdir -p /c/pixelpulse_64/qml
+          cd /mingw64/share/qt5/qml
+          cp -r QtQuick QtQuick.2 QtQml QtGraphicalEffects /c/pixelpulse_64/qml/
+
+      - name: Copy runtime DLLs
+        # nullglob so a renamed/dropped DLL can't abort the copy; libboost_*.dll
+        # grabs whatever Boost ships (1.91 made system/regex header-only).
+        run: |
+          shopt -s nullglob
+          cd /mingw64/bin
+          cp -r libffi*.dll libbrotli*.dll libbz2*.dll libgobject-2.*.dll \
+            libfreetype-*.dll libgraphite*.dll libpng16-*.dll libharfbuzz*.dll \
+            libicu*.dll libiconv*.dll zlib*.dll libsmu*.dll libwinpthread-*.dll \
+            libgcc_*.dll libstdc++-*.dll libboost_*.dll libglib-*.dll \
+            libintl-*.dll libusb-*.dll libzstd*.dll libgomp*.dll \
+            libdouble-conversion*.dll libpcre*.dll \
+            Qt5Core.dll Qt5Gui.dll Qt5Svg.dll Qt5Widgets.dll \
+            /c/pixelpulse_64/
+
+      - name: Create portable zip
+        run: 7z a /c/pixelpulse-64bit.zip /c/pixelpulse_64
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Q C:\projects\build_64\pixelpulse2.iss
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixelpulse2-windows
+          path: |
+            C:\pixelpulse-64bit.zip
+            C:\Pixelpulse2_win_setup.exe
+          if-no-files-found: error
