@@ -111,4 +111,4 @@ build_script:
     - set PATH=%PATH%;"C:\Program Files (x86)\Inno Setup 6"
     - ISCC /Q pixelpulse2.iss
 
-    - ps: appveyor PushArtifact c:\Pixelpulse2_win_setup.exe
+    - ps: Push-AppveyorArtifact c:\Pixelpulse2_win_setup.exe
