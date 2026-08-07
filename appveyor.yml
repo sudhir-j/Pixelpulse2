@@ -33,8 +33,10 @@ build_script:
     # build 64-bit MinGW
     #clone and build libsmu with mingw
     - set PATH=C:\msys64\mingw64\bin;%PATH%
-    - C:\msys64\usr\bin\bash -lc "pacman --noconfirm -U https://repo.msys2.org/mingw/x86_64/mingw-w64-x86_64-libusb-1.0.23-1-any.pkg.tar.xz"
-    - C:\msys64\usr\bin\bash -lc "pacman --noconfirm -U https://repo.msys2.org/mingw/x86_64/mingw-w64-x86_64-qt5-5.15.2-5-any.pkg.tar.zst"
+    # Install current libusb and Qt5 from the repos. (The old pinned
+    # package URLs 404 now: repo.msys2.org only keeps the latest build of
+    # each version.)
+    - C:\msys64\usr\bin\bash -lc "pacman --noconfirm -S mingw-w64-x86_64-libusb mingw-w64-x86_64-qt5"
 
     # Hack: Qt5Qml CMake script throws errors when loading its plugins. So let's just drop those plugins.
     - rm -f /mingw64/lib/cmake/Qt5Qml/*Factory.cmake
