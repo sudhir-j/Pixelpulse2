@@ -61,24 +61,22 @@ build_script:
     - copy C:\projects\libsmu\dist\amd64\* c:\pixelpulse_64\drivers\amd64
     - copy C:\dpinst\dpinst_amd64.exe C:\pixelpulse_64\drivers
 
-    # --- Diagnostics for qmlimportscanner returning 3221225785 (0xC0000139,
-    # STATUS_ENTRYPOINT_NOT_FOUND): a DLL loads but is missing an expected
-    # export -> a version mismatch. These are non-fatal (|| true / trailing
-    # echo) so the build still proceeds to the real windeployqt call below.
-    #  1. installed Qt5 package versions -- component skew is the prime suspect
-    - C:\msys64\usr\bin\bash -lc "pacman -Q | grep -i qt5 || true"
-    #  2. which DLLs the scanner resolves to -- any outside /mingw64 is the smoking gun
-    - C:\msys64\usr\bin\bash -lc "PATH=/mingw64/bin:$PATH ldd /mingw64/bin/qmlimportscanner.exe || true"
-    #  3. run the scanner standalone with the same args windeployqt uses. If this
-    #     works, windeployqt spawns it with a broken env; if it fails the same, the
-    #     installed Qt5 tool/DLLs are mismatched.
-    - C:\msys64\usr\bin\bash -lc "PATH=/mingw64/bin:$PATH /mingw64/bin/qmlimportscanner.exe -rootPath /c/projects/pixelpulse2/qml -importPath /mingw64/share/qt5/qml ; echo qmlimportscanner-exit=$?"
+    # Deploy Qt with windeployqt-qt5.exe (the plain windeployqt name now
+    # belongs to Qt6). We deliberately DROP the --qmldir/--qmlimport options:
+    # those make windeployqt spawn qmlimportscanner.exe, which is broken in the
+    # current MSYS2 packaging (qt5-tools is the plain 5.15.19-1 build while
+    # qt5-base/qt5-declarative are the KDE-patched 5.15.19+kde builds -- the
+    # patch set dropped a Qt5Core export the scanner imports, so it dies with
+    # 0xC0000139 STATUS_ENTRYPOINT_NOT_FOUND / exit 3221225785). Without those
+    # options windeployqt still deploys the core Qt/QML runtime from the exe's
+    # own imports; we copy the QML modules the app uses by hand below.
+    - set PATH=C:\msys64\mingw64\bin;%PATH% && c:\msys64\mingw64\bin\windeployqt-qt5.exe --dir c:\pixelpulse_64 --no-system-d3d-compiler --no-compiler-runtime --opengl c:\projects\build_64\pixelpulse2.exe
 
-    # MSYS2 ships the Qt5 deploy tool as windeployqt-qt5.exe (the plain
-    # windeployqt name now belongs to Qt6). Prepend mingw64\bin to PATH on
-    # the same line so the qmlimportscanner.exe it spawns can resolve the
-    # Qt/ICU DLLs (AppVeyor doesn't persist `set` across commands).
-    - set PATH=C:\msys64\mingw64\bin;%PATH% && c:\msys64\mingw64\bin\windeployqt-qt5.exe --dir c:\pixelpulse_64 --no-system-d3d-compiler --no-compiler-runtime --opengl --qmldir c:\projects\pixelpulse2\qml --qmlimport c:\projects\pixelpulse2\qml c:\projects\build_64\pixelpulse2.exe
+    # Copy the QML modules the app imports (see qml/*.qml import statements):
+    # QtQuick + its submodules (Controls, Controls.Styles, Dialogs, Layouts,
+    # Window), QtQml + Models, and QtGraphicalEffects. QtQuick.2 is the QtQuick
+    # core plugin dir. This replaces the qmlimportscanner-driven deployment.
+    - C:\msys64\usr\bin\bash -lc "mkdir -p /c/pixelpulse_64/qml && cd /mingw64/share/qt5/qml && cp -r QtQuick QtQuick.2 QtQml QtGraphicalEffects /c/pixelpulse_64/qml/"
 
     - C:\msys64\usr\bin\bash -lc "cd /mingw64/bin ; cp -r libffi*.dll libbrotli*.dll libbz2*.dll libgobject-2.*.dll libfreetype-*.dll libgraphite*.dll libpng16-*.dll libharfbuzz*.dll libicu*.dll libiconv*.dll zlib*.dll libsmu*.dll libwinpthread-*.dll libgcc_*.dll libstdc++-*.dll libboost_{system,filesystem,atomic,program_options,regex,thread}-*.dll libglib-*.dll libintl-*.dll libusb-*.dll libzstd*.dll libgomp*.dll libdouble-conversion*.dll libpcre*.dll /c/pixelpulse_64/"
     - C:\msys64\usr\bin\bash -lc "cd /mingw64/bin ; cp -r Qt5Core.dll Qt5Gui.dll Qt5Svg.dll Qt5Widgets.dll /c/pixelpulse_64/"
