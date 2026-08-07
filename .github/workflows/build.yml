@@ -11,8 +11,16 @@ jobs:
   # Linux: build pixelpulse2 and package it as a .deb and a .tar.gz via CPack.
   # ---------------------------------------------------------------------------
   linux:
-    name: Linux (Ubuntu, .deb + .tar.gz)
-    runs-on: ubuntu-22.04
+    name: Linux ${{ matrix.arch }} (.deb + .tar.gz)
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: amd64
+          - runner: ubuntu-22.04-arm
+            arch: arm64
     steps:
       - uses: actions/checkout@v4
 
@@ -55,7 +63,7 @@ jobs:
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pixelpulse2-linux
+          name: pixelpulse2-linux-${{ matrix.arch }}
           path: |
             build/*.deb
             build/*.tar.gz
