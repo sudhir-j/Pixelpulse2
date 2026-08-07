@@ -87,7 +87,12 @@ build_script:
     # core plugin dir. This replaces the qmlimportscanner-driven deployment.
     - C:\msys64\usr\bin\bash -lc "mkdir -p /c/pixelpulse_64/qml && cd /mingw64/share/qt5/qml && cp -r QtQuick QtQuick.2 QtQml QtGraphicalEffects /c/pixelpulse_64/qml/"
 
-    - C:\msys64\usr\bin\bash -lc "cd /mingw64/bin ; cp -r libffi*.dll libbrotli*.dll libbz2*.dll libgobject-2.*.dll libfreetype-*.dll libgraphite*.dll libpng16-*.dll libharfbuzz*.dll libicu*.dll libiconv*.dll zlib*.dll libsmu*.dll libwinpthread-*.dll libgcc_*.dll libstdc++-*.dll libboost_{system,filesystem,atomic,program_options,regex,thread}-*.dll libglib-*.dll libintl-*.dll libusb-*.dll libzstd*.dll libgomp*.dll libdouble-conversion*.dll libpcre*.dll /c/pixelpulse_64/"
+    # shopt -s nullglob: non-matching globs expand to nothing instead of
+    # erroring, so a package renaming/dropping a DLL can't abort the whole
+    # copy. libboost_*.dll grabs whatever Boost libs actually ship -- Boost
+    # 1.91 made system and regex header-only (no DLL), so the old explicit
+    # libboost_{system,...,regex} brace-list failed with "cannot stat".
+    - C:\msys64\usr\bin\bash -lc "shopt -s nullglob; cd /mingw64/bin ; cp -r libffi*.dll libbrotli*.dll libbz2*.dll libgobject-2.*.dll libfreetype-*.dll libgraphite*.dll libpng16-*.dll libharfbuzz*.dll libicu*.dll libiconv*.dll zlib*.dll libsmu*.dll libwinpthread-*.dll libgcc_*.dll libstdc++-*.dll libboost_*.dll libglib-*.dll libintl-*.dll libusb-*.dll libzstd*.dll libgomp*.dll libdouble-conversion*.dll libpcre*.dll /c/pixelpulse_64/"
     - C:\msys64\usr\bin\bash -lc "cd /mingw64/bin ; cp -r Qt5Core.dll Qt5Gui.dll Qt5Svg.dll Qt5Widgets.dll /c/pixelpulse_64/"
 
     - 7z a "c:\pixelpulse-64bit.zip" c:\pixelpulse_64
