@@ -70,7 +70,11 @@ build_script:
     # 0xC0000139 STATUS_ENTRYPOINT_NOT_FOUND / exit 3221225785). Without those
     # options windeployqt still deploys the core Qt/QML runtime from the exe's
     # own imports; we copy the QML modules the app uses by hand below.
-    - set PATH=C:\msys64\mingw64\bin;%PATH% && c:\msys64\mingw64\bin\windeployqt-qt5.exe --dir c:\pixelpulse_64 --no-system-d3d-compiler --no-compiler-runtime --opengl c:\projects\build_64\pixelpulse2.exe
+    #
+    # --no-angle: MSYS2's MinGW Qt5 is a desktop-OpenGL build and ships no
+    # ANGLE, so windeployqt's attempt to bundle libGLESv2.dll/libEGL.dll fails
+    # fatally with "libGLESv2.dll does not exist". Disable ANGLE deployment.
+    - set PATH=C:\msys64\mingw64\bin;%PATH% && c:\msys64\mingw64\bin\windeployqt-qt5.exe --dir c:\pixelpulse_64 --no-system-d3d-compiler --no-compiler-runtime --no-angle --opengl c:\projects\build_64\pixelpulse2.exe
 
     # Copy the QML modules the app imports (see qml/*.qml import statements):
     # QtQuick + its submodules (Controls, Controls.Styles, Dialogs, Layouts,
