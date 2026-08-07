@@ -96,7 +96,11 @@ build_script:
     - C:\msys64\usr\bin\bash -lc "cd /mingw64/bin ; cp -r Qt5Core.dll Qt5Gui.dll Qt5Svg.dll Qt5Widgets.dll /c/pixelpulse_64/"
 
     - 7z a "c:\pixelpulse-64bit.zip" c:\pixelpulse_64
-    - appveyor PushArtifact c:\pixelpulse-64bit.zip
+    # Use the Push-AppveyorArtifact PS cmdlet (built into AppVeyor's PowerShell
+    # host) rather than the `appveyor` exe: the exe is not reliably on PATH in
+    # this cmd phase ("'appveyor' is not recognized"). Matches the installer
+    # push below, which already uses the `- ps:` form.
+    - ps: Push-AppveyorArtifact c:\pixelpulse-64bit.zip
 
   # Install Inno Setup
     - choco install InnoSetup
