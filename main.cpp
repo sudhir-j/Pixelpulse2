@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
 
     QLocale::setDefault(QLocale(QLocale::English, QLocale::UnitedStates));
 
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
     QQmlApplicationEngine engine;
 
     registerTypes();
