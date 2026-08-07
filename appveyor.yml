@@ -62,8 +62,10 @@ build_script:
     - copy C:\dpinst\dpinst_amd64.exe C:\pixelpulse_64\drivers
 
     # MSYS2 ships the Qt5 deploy tool as windeployqt-qt5.exe (the plain
-    # windeployqt name now belongs to Qt6).
-    - c:\msys64\mingw64\bin\windeployqt-qt5.exe --dir c:\pixelpulse_64 --no-system-d3d-compiler --no-compiler-runtime --opengl --qmldir c:\projects\pixelpulse2\qml --qmlimport c:\projects\pixelpulse2\qml c:\projects\build_64\pixelpulse2.exe
+    # windeployqt name now belongs to Qt6). Prepend mingw64\bin to PATH on
+    # the same line so the qmlimportscanner.exe it spawns can resolve the
+    # Qt/ICU DLLs (AppVeyor doesn't persist `set` across commands).
+    - set PATH=C:\msys64\mingw64\bin;%PATH% && c:\msys64\mingw64\bin\windeployqt-qt5.exe --dir c:\pixelpulse_64 --no-system-d3d-compiler --no-compiler-runtime --opengl --qmldir c:\projects\pixelpulse2\qml --qmlimport c:\projects\pixelpulse2\qml c:\projects\build_64\pixelpulse2.exe
 
     - C:\msys64\usr\bin\bash -lc "cd /mingw64/bin ; cp -r libffi*.dll libbrotli*.dll libbz2*.dll libgobject-2.*.dll libfreetype-*.dll libgraphite*.dll libpng16-*.dll libharfbuzz*.dll libicu*.dll libiconv*.dll zlib*.dll libsmu*.dll libwinpthread-*.dll libgcc_*.dll libstdc++-*.dll libboost_{system,filesystem,atomic,program_options,regex,thread}-*.dll libglib-*.dll libintl-*.dll libusb-*.dll libzstd*.dll libgomp*.dll libdouble-conversion*.dll libpcre*.dll /c/pixelpulse_64/"
     - C:\msys64\usr\bin\bash -lc "cd /mingw64/bin ; cp -r Qt5Core.dll Qt5Gui.dll Qt5Svg.dll Qt5Widgets.dll /c/pixelpulse_64/"
