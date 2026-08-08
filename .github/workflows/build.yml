@@ -239,6 +239,11 @@ jobs:
         run: |
           export PATH="$(brew --prefix qt@5)/bin:$PATH"
           git clone --depth=1 https://github.com/analogdevicesinc/libsmu.git
+          # libsmu's src/CMakeLists.txt hardcodes CMAKE_OSX_ARCHITECTURES to
+          # x86_64 (a plain set(), so -D can't override it). On this arm64
+          # runner that produces an x86_64 object that fails to link against
+          # the arm64 Homebrew libusb -- retarget it to the host arch.
+          sed -i '' "s/set(CMAKE_OSX_ARCHITECTURES \"x86_64\")/set(CMAKE_OSX_ARCHITECTURES \"$(uname -m)\")/" libsmu/src/CMakeLists.txt
           cmake -S libsmu -B libsmu/build \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DCMAKE_CXX_FLAGS=-std=c++14 \
