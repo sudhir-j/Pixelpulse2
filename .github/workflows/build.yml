@@ -244,9 +244,14 @@ jobs:
           # runner that produces an x86_64 object that fails to link against
           # the arm64 Homebrew libusb -- retarget it to the host arch.
           sed -i '' "s/set(CMAKE_OSX_ARCHITECTURES \"x86_64\")/set(CMAKE_OSX_ARCHITECTURES \"$(uname -m)\")/" libsmu/src/CMakeLists.txt
+          # BUILD_CLI=OFF: the CLI's install rule targets an unset framework
+          # dir (${OSX_INSTALL_FRAMEWORKSDIR}/libsmu.framework/cli -> the
+          # absolute path /libsmu.framework/cli), which fails to install. We
+          # only need the shared library, so skip the CLI entirely.
           cmake -S libsmu -B libsmu/build \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DCMAKE_CXX_FLAGS=-std=c++14 \
+            -DBUILD_CLI=OFF \
             -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PYTHON=OFF \
             -DCMAKE_INSTALL_PREFIX=/usr/local
           cmake --build libsmu/build -j"$(sysctl -n hw.ncpu)"
