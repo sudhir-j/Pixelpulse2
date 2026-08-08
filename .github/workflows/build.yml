@@ -290,20 +290,21 @@ jobs:
             "@executable_path/../Frameworks/${libsmuid}" "$exe"
 
           # Copying the pristine libsmu over macdeployqt's rewritten copy also
-          # reverts libsmu's OWN dependency on libusb back to the build host's
-          # Homebrew path (/opt/homebrew/.../libusb-1.0.0.dylib). macdeployqt
-          # already bundled libusb into Frameworks, so repoint libsmu at the
-          # bundled copy -- otherwise the app aborts at launch on any Mac
-          # without that Homebrew path ("Library not loaded").
-          libusbdep="$(otool -L "$app/Contents/Frameworks/${libsmuid}" | awk '/libusb/ {print $1; exit}')"
-          if [ -n "$libusbdep" ]; then
-            libusbid="$(basename "$libusbdep")"
-            install_name_tool -change "$libusbdep" \
-              "@executable_path/../Frameworks/${libusbid}" \
-              "$app/Contents/Frameworks/${libsmuid}"
-          fi
+          # reverts libsmu's OWN dependencies (libusb, and any other Homebrew
+          # lib it links) back to their build-host paths (/opt/homebrew/... or
+          # /usr/local/...). macdeployqt already bundled those into Frameworks,
+          # so repoint every such reference at the bundled copy -- otherwise the
+          # app aborts at launch on any Mac without that path ("Library not
+          # loaded"). Only libsmu needs this: it is the sole dylib we overwrite
+          # after macdeployqt has fixed up the bundle.
+          bundled="$app/Contents/Frameworks/${libsmuid}"
+          otool -L "$bundled" | awk 'NR>1 {print $1}' | \
+            grep -E '^(/opt/homebrew|/usr/local)/' | while read -r dep; do
+              install_name_tool -change "$dep" \
+                "@executable_path/../Frameworks/$(basename "$dep")" "$bundled"
+            done
           otool -L "$exe"
-          otool -L "$app/Contents/Frameworks/${libsmuid}"
+          otool -L "$bundled"
 
           # install_name_tool invalidates the ad-hoc signatures arm64 requires.
           # Re-sign as the LAST mutation of the bundle and verify the result:
