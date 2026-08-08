@@ -9,12 +9,35 @@
 #include <QDebug>
 #include <QTextStream>
 #include<QDataStream>
+#include <QFileDialog>
 
 class FileIO : public QObject
 {
     Q_OBJECT
 
 public slots:
+    /// Show a "Save As" dialog and return the chosen path (empty if
+    /// cancelled). Used instead of QML QtQuick.Dialogs FileDialog, whose
+    /// fallback implementation does not render on macOS.
+    QUrl getSaveFileName(const QString& title, const QString& nameFilter) {
+        QString path = QFileDialog::getSaveFileName(nullptr, title, QString(),
+                                                    nameFilter, nullptr,
+                                                    fileDialogOptions());
+        if (path.isEmpty())
+            return QUrl();
+        return QUrl::fromLocalFile(path);
+    }
+
+    /// Show an "Open" dialog and return the chosen path (empty if cancelled).
+    QUrl getOpenFileName(const QString& title, const QString& nameFilter) {
+        QString path = QFileDialog::getOpenFileName(nullptr, title, QString(),
+                                                    nameFilter, nullptr,
+                                                    fileDialogOptions());
+        if (path.isEmpty())
+            return QUrl();
+        return QUrl::fromLocalFile(path);
+    }
+
 	/// accept a file handle by URI and source datastring
     bool writeByURI(const QUrl& destination, const QString& data) {
         auto path = destination.toLocalFile();
@@ -61,6 +84,19 @@ public slots:
 
 public:
     FileIO() {}
+
+private:
+    /// Options for the QFileDialog helpers above. On macOS the native (cocoa)
+    /// panel fails to display in this build and returns an empty selection
+    /// immediately, so force Qt's own widget-based dialog there. Other
+    /// platforms keep their working native dialog.
+    static QFileDialog::Options fileDialogOptions() {
+#ifdef Q_OS_MAC
+        return QFileDialog::DontUseNativeDialog;
+#else
+        return QFileDialog::Options();
+#endif
+    }
 };
 
 #endif // FILEIO_H

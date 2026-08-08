@@ -24,26 +24,23 @@ ToolbarStyle {
     id: sessAcqSettDialog
   }
 
-  FileDialog {
-    id: dataDialog
-    selectExisting: false
-    title: "Please enter a location to save your data."
-    nameFilters: [ "CSV files (*.csv)", "All files (*)" ]
-    onAccepted: { CSVExport.saveData(dataDialog.fileUrls[0]);}
+  // File selection goes through QFileDialog helpers on the C++ FileIO object
+  // instead of QtQuick.Dialogs FileDialog: the QML fallback dialog reports
+  // visible=true but never renders a window on macOS.
+  function exportData() {
+    var url = fileio.getSaveFileName("Please enter a location to save your data.",
+                                     "CSV files (*.csv);;All files (*)");
+    if (url != "") CSVExport.saveData(url);
   }
-  FileDialog {
-    id: sessSaveDialog
-    selectExisting: false
-    title: "Please enter a location to save your session."
-    nameFilters: [ "JSON files (*.json)", "All files (*)" ]
-    onAccepted: { fileio.writeByURI(sessSaveDialog.fileUrls[0], JSON.stringify(StateSave.saveState(), 0, 2));}
+  function saveSession() {
+    var url = fileio.getSaveFileName("Please enter a location to save your session.",
+                                     "JSON files (*.json);;All files (*)");
+    if (url != "") fileio.writeByURI(url, JSON.stringify(StateSave.saveState(), 0, 2));
   }
-  FileDialog {
-    id: sessRestoreDialog
-    selectExisting: true
-    title: "Please select a session to restore."
-    nameFilters: [ "JSON files (*.json)", "All files (*)" ]
-    onAccepted: { StateSave.restoreState(JSON.parse(fileio.readByURI(sessRestoreDialog.fileUrls[0])));}
+  function restoreSession() {
+    var url = fileio.getOpenFileName("Please select a session to restore.",
+                                     "JSON files (*.json);;All files (*)");
+    if (url != "") StateSave.restoreState(JSON.parse(fileio.readByURI(url)));
   }
 
   ColorControlDialog {
@@ -112,17 +109,17 @@ ToolbarStyle {
       MenuItem {
         id: dataSaveVisibleItem
         text: "Export Data"
-        onTriggered: dataDialog.visible = true
+        onTriggered: exportData()
       }
       MenuItem {
         id: sessionSaveVisibleItem
         text: "Save Session"
-        onTriggered: sessSaveDialog.visible = true
+        onTriggered: saveSession()
       }
       MenuItem {
         id: sessionRestoreVisibleItem
         text: "Restore Session"
-        onTriggered: sessRestoreDialog.visible = true
+        onTriggered: restoreSession()
       }
       MenuItem {
         id: colorControlVisibleItem

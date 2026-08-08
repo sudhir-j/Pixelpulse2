@@ -189,6 +189,17 @@ add_executable(${PROJECT_NAME} WIN32 ${OSX_BUNDLE}
 if (NOT ENABLE_APPLICATION_BUNDLE)
 	install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
 	install(FILES ${CMAKE_SOURCE_DIR}/icons/pp2.ico DESTINATION share/icons/hicolor/apps/scalable RENAME pp2.ico)
+
+	# On Linux, bundle libsmu's shared library into the package so it is
+	# self-contained. libsmu has no distro package, so we can neither depend
+	# on one nor let dpkg-shlibdeps resolve it -- ship the .so ourselves.
+	if (UNIX AND NOT APPLE AND LIBSMU_LIBRARIES)
+		get_filename_component(_libsmu_dir "${LIBSMU_LIBRARIES}" DIRECTORY)
+		file(GLOB LIBSMU_RUNTIME_LIBS "${_libsmu_dir}/libsmu.so*")
+		if (LIBSMU_RUNTIME_LIBS)
+			install(FILES ${LIBSMU_RUNTIME_LIBS} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+		endif()
+	endif()
 endif()
 
 # Compiler options
@@ -223,4 +234,35 @@ if (NOT WIN32)
 	if (PTHREAD_LIBRARIES)
 		target_link_libraries(${PROJECT_NAME} LINK_PRIVATE ${PTHREAD_LIBRARIES})
 	endif()
+endif()
+
+# CPack: on Linux build a .deb and a .tar.gz from the install() rules above.
+# (Windows is packaged separately via Inno Setup / pixelpulse2.iss.)
+if (UNIX AND NOT APPLE)
+	set(CPACK_GENERATOR "DEB;TGZ")
+	set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
+	set(CPACK_PACKAGE_VENDOR "Analog Devices, Inc.")
+	set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Signal visualizer and controller for the ADALM1000")
+	set(CPACK_PACKAGE_VERSION ${PP_VERSION})
+	set(CPACK_PACKAGE_VERSION_MAJOR ${PP_VERSION_MAJOR})
+	set(CPACK_PACKAGE_VERSION_MINOR ${PP_VERSION_MINOR})
+	set(CPACK_PACKAGE_VERSION_PATCH ${PP_VERSION_PATCH})
+	set(CPACK_PACKAGING_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
+
+	# Debian package specifics
+	set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Analog Devices, Inc.")
+	set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/analogdevicesinc/Pixelpulse2")
+	set(CPACK_DEBIAN_PACKAGE_SECTION "electronics")
+	# Resolve shared-library run-time dependencies (Qt5, libusb, ...)
+	# automatically from what the binary links against. We ship libsmu.so
+	# inside the package (see install rule above), so it must NOT appear as a
+	# Depends -- it has no distro package and would be unsatisfiable. Exclude
+	# the bundled lib's directory from shlibdeps scanning for the same reason.
+	set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+	# The Qt5 QML runtime modules are data dependencies the linker can't see,
+	# so declare them explicitly. These are all real packages in the Ubuntu
+	# repos.
+	set(CPACK_DEBIAN_PACKAGE_DEPENDS "qml-module-qtquick2, qml-module-qtquick-controls, qml-module-qtquick-dialogs, qml-module-qtquick-layouts, qml-module-qtquick-window2, qml-module-qtgraphicaleffects")
+
+	include(CPack)
 endif()
