@@ -217,3 +217,79 @@ jobs:
             C:\pixelpulse-64bit.zip
             C:\Pixelpulse2_win_setup.exe
           if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # macOS: build Pixelpulse2.app and package it as a .dmg. Ported from the old
+  # .travis.yml osx recipe (macdeployqt + manual libsmu install-name rewrite),
+  # adapted for Apple Silicon: Homebrew lives at /opt/homebrew, Qt5 is the
+  # keg-only qt@5 (plain `qt` is Qt6 now), and the install_name_tool rewrite
+  # invalidates the ad-hoc code signature macOS applies on arm64, so we re-sign
+  # before building the dmg. Unsigned/ad-hoc, matching the original repo.
+  # ---------------------------------------------------------------------------
+  macos:
+    name: macOS arm64 (.dmg)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: brew install qt@5 libusb boost cmake
+
+      - name: Build and install libsmu
+        run: |
+          export PATH="$(brew --prefix qt@5)/bin:$PATH"
+          git clone --depth=1 https://github.com/analogdevicesinc/libsmu.git
+          cmake -S libsmu -B libsmu/build \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_CXX_FLAGS=-std=c++14 \
+            -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PYTHON=OFF \
+            -DCMAKE_INSTALL_PREFIX=/usr/local
+          cmake --build libsmu/build -j"$(sysctl -n hw.ncpu)"
+          sudo cmake --install libsmu/build
+
+      - name: Configure and build pixelpulse2
+        run: |
+          export PATH="$(brew --prefix qt@5)/bin:$PATH"
+          cmake -S . -B build \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@5)"
+          cmake --build build -j"$(sysctl -n hw.ncpu)"
+
+      - name: Bundle Qt and libsmu into the .app
+        working-directory: build
+        run: |
+          macdeployqt="$(brew --prefix qt@5)/bin/macdeployqt"
+          app=pixelpulse2.app
+          exe="$app/Contents/MacOS/pixelpulse2"
+
+          # Bundle the Qt frameworks/plugins and the app's QML imports.
+          "$macdeployqt" "$app" -always-overwrite -verbose=2 -qmldir=../qml
+
+          # macdeployqt does not bundle libsmu -- copy it in and rewrite its
+          # install name to load from within the bundle (as the old Travis
+          # recipe did). The exe's link line gives the install-name libsmu was
+          # built with (may be an @rpath path, not a real file), so resolve the
+          # actual dylib from the install prefix and match its basename.
+          libsmupath="$(otool -L "$exe" | awk '/libsmu/ {print $1; exit}')"
+          libsmuid="$(basename "$libsmupath")"
+          cp "/usr/local/lib/${libsmuid}" "$app/Contents/Frameworks/"
+          install_name_tool -id "@executable_path/../Frameworks/${libsmuid}" \
+            "$app/Contents/Frameworks/${libsmuid}"
+          install_name_tool -change "$libsmupath" \
+            "@executable_path/../Frameworks/${libsmuid}" "$exe"
+          otool -L "$exe"
+
+          # install_name_tool invalidates the ad-hoc signature arm64 requires;
+          # re-sign the bundle before packaging.
+          codesign --force --deep --sign - "$app"
+
+          # Produce the .dmg.
+          "$macdeployqt" "$app" -dmg -no-plugins
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixelpulse2-macos-arm64
+          path: build/pixelpulse2.dmg
+          if-no-files-found: error
