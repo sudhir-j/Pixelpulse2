@@ -290,12 +290,20 @@ jobs:
             "@executable_path/../Frameworks/${libsmuid}" "$exe"
           otool -L "$exe"
 
-          # install_name_tool invalidates the ad-hoc signature arm64 requires;
-          # re-sign the bundle before packaging.
+          # install_name_tool invalidates the ad-hoc signatures arm64 requires.
+          # Re-sign as the LAST mutation of the bundle and verify the result:
+          # if any nested Mach-O keeps a broken signature, macOS reports the app
+          # as "damaged" (a hard block) rather than merely unverified. This must
+          # come after every install_name_tool call and before packaging.
           codesign --force --deep --sign - "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
 
-          # Produce the .dmg.
-          "$macdeployqt" "$app" -dmg -no-plugins
+          # Build the .dmg with hdiutil rather than a second macdeployqt pass:
+          # macdeployqt -dmg re-touches the bundle and would invalidate the
+          # signature we just applied, whereas hdiutil only copies the (signed)
+          # app into a compressed image, preserving the signature.
+          hdiutil create -volname pixelpulse2 -srcfolder "$app" \
+            -ov -format UDZO pixelpulse2.dmg
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
